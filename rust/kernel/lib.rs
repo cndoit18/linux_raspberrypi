@@ -52,6 +52,7 @@ pub mod miscdev;
 pub mod mm;
 pub mod of;
 pub mod pages;
+pub mod platform;
 pub mod prelude;
 pub mod print;
 mod static_assert;
