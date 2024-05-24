@@ -15,6 +15,7 @@
 #![feature(allocator_api)]
 #![feature(associated_type_defaults)]
 #![feature(coerce_unsized)]
+#![feature(const_refs_to_cell)]
 #![feature(c_size_t)]
 #![feature(dispatch_from_dyn)]
 #![feature(new_uninit)]
@@ -35,8 +36,9 @@ extern crate self as kernel;
 mod allocator;
 mod build_assert;
 pub mod cred;
-pub mod device;
 pub mod delay;
+pub mod device;
+pub mod driver;
 pub mod error;
 pub mod file;
 pub mod fs;
@@ -48,6 +50,7 @@ pub mod iov_iter;
 pub mod kunit;
 pub mod miscdev;
 pub mod mm;
+pub mod of;
 pub mod pages;
 pub mod prelude;
 pub mod print;
