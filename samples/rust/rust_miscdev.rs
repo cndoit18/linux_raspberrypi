@@ -10,18 +10,19 @@
 //! / # sudo chmod 777 /dev/rust_misc
 //! / # sudo echo "hello" > /dev/rust_misc
 //! / # sudo cat /dev/rust_misc  -> Hello
-//! 
+//!
+
+use core::ops::{Deref, DerefMut};
+use core::result::Result::Ok;
 
 use kernel::prelude::*;
 use kernel::{
     file::{self, File},
-    io_buffer::{IoBufferReader, IoBufferWriter},
-    sync::{Arc, ArcBorrow},
-    sync::Mutex,
-    miscdev, 
-    pin_init,
-    new_mutex,
     fmt,
+    io_buffer::{IoBufferReader, IoBufferWriter},
+    miscdev, new_mutex, pin_init,
+    sync::Mutex,
+    sync::{Arc, ArcBorrow},
 };
 
 module! {
@@ -37,17 +38,15 @@ const GLOBALMEM_SIZE: usize = 0x1000;
 #[pin_data]
 struct RustMiscdevData {
     #[pin]
-    inner: Mutex<[u8;GLOBALMEM_SIZE]>,
+    inner: Mutex<[u8; GLOBALMEM_SIZE]>,
 }
 
 impl RustMiscdevData {
-    fn try_new() -> Result<Arc<Self>>{
+    fn try_new() -> Result<Arc<Self>> {
         pr_info!("rust miscdevice created\n");
-        Ok(Arc::pin_init(
-            pin_init!(Self {
-                inner <- new_mutex!([0u8;GLOBALMEM_SIZE])
-            })
-        )?)
+        Ok(Arc::pin_init(pin_init!(Self {
+            inner <- new_mutex!([0u8;GLOBALMEM_SIZE])
+        }))?)
     }
 }
 
@@ -62,34 +61,39 @@ impl file::Operations for RustFile {
     type Data = Arc<RustMiscdevData>;
     type OpenData = Arc<RustMiscdevData>;
 
-    fn open(_shared: &Arc<RustMiscdevData>, _file: &file::File) -> Result<Self::Data> {
+    fn open(shared: &Arc<RustMiscdevData>, _file: &file::File) -> Result<Self::Data> {
         pr_info!("open in miscdevice\n",);
-        //TODO
-        todo!()
+        Ok(shared.clone())
     }
 
     fn read(
-        _shared: ArcBorrow<'_, RustMiscdevData>,
+        shared: ArcBorrow<'_, RustMiscdevData>,
         _file: &File,
-        _writer: &mut impl IoBufferWriter,
-        _offset: u64,
+        writer: &mut impl IoBufferWriter,
+        offset: u64,
     ) -> Result<usize> {
         pr_info!("read in miscdevice\n");
-        //TODO
-        todo!()
-        
+        let binding = shared.deref().inner.lock();
+        let s: &[u8] = binding.deref();
+        file::read_from_slice(&s, writer, offset)
     }
 
     fn write(
-        _shared: ArcBorrow<'_, RustMiscdevData>,
+        shared: ArcBorrow<'_, RustMiscdevData>,
         _file: &File,
-        _reader: &mut impl IoBufferReader,
-        _offset: u64,
+        reader: &mut impl IoBufferReader,
+        offset: u64,
     ) -> Result<usize> {
         pr_info!("write in miscdevice\n");
-        //TODO
-        todo!()
-
+        let mut binding = shared.deref().inner.lock();
+        let s: &mut [u8] = binding.deref_mut();
+        let offset = offset.try_into()?;
+        if offset >= s.len() {
+            return Ok(0);
+        }
+        let len = core::cmp::min(s.len() - offset, reader.len());
+        reader.read_slice(&mut s[offset..][..len])?;
+        Ok(len)
     }
 
     fn release(_data: Self::Data, _file: &File) {
